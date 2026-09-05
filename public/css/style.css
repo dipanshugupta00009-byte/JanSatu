@@ -8,15 +8,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --ink: #1B2A22;
-  --rust: #B5502D;
-  --rust-dark: #8F3F22;
+  --ink: #11276a;
+  --rust: #1b4a80;
+  --rust-dark: #1b4a80;
   --sal: #3B6E4F;
-  --ochre: #D6A123;
-  --mahua: #F1E8D8;
-  --paper: #FBF7EF;
-  --line: #DCD0B8;
-  --muted: #6B6455;
+  --ochre: #3B6E4F;
+  --mahua: #bdebe4;
+  --paper: #ffffff;
+  --line: #9fdddc;
+  --muted: #0f1a31;
   --danger: #A5352C;
 
   --font-display: 'Fraunces', serif;
