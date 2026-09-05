@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Review Dashboard — JanSatu</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="topbar" class="topbar"></div>
+
+<div class="page-head">
+  <div class="container">
+    <div class="eyebrow">Coordinator view</div>
+    <h1 style="font-size:2rem;">Review dashboard</h1>
+  </div>
+</div>
+
+<div id="deniedNotice" style="display:none;" class="container" style="padding-top:24px;">
+  <div class="alert alert-error">This area is for institution, industry and admin accounts only.</div>
+</div>
+
+<section class="container" id="dashContent" style="display:none;">
+  <div class="dash-grid" id="statCards"></div>
+
+  <div class="filters-bar">
+    <select id="statusFilter">
+      <option value="">All statuses</option>
+      <option>Submitted</option><option>Under Review</option><option>Assigned</option>
+      <option>In Progress</option><option>Resolved</option><option>Rejected</option>
+    </select>
+    <select id="categoryFilter"><option value="">All categories</option></select>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr><th>ID</th><th>Title</th><th>Category</th><th>District</th><th>Priority</th><th>Status</th><th>Filed</th><th>Tracking</th></tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</section>
+
+<footer>
+  <div class="container"><p>JanSatu</p></div>
+</footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script>
+renderNav('dashboard');
+function escapeHtml(s) { return (s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+const user = requireAuth(['admin', 'institution', 'industry']);
+if (user) {
+  document.getElementById('dashContent').style.display = 'block';
+
+  API.get('/api/categories').then((c) => {
+    const sel = document.getElementById('categoryFilter');
+    c.categories.forEach((cat) => {
+      const opt = document.createElement('option'); opt.value = cat; opt.textContent = cat;
+      sel.appendChild(opt);
+    });
+  });
+
+  API.get('/api/stats').then((s) => {
+    const cards = [
+      { n: s.total, l: 'Total challenges' },
+      { n: s.byStatus['Submitted'] || 0, l: 'Awaiting review' },
+      { n: s.byStatus['In Progress'] || 0, l: 'In progress' },
+      { n: s.byStatus['Resolved'] || 0, l: 'Resolved' }
+    ];
+    document.getElementById('statCards').innerHTML = cards.map((c) => `<div class="dash-card"><div class="n">${c.n}</div><div class="l">${c.l}</div></div>`).join('');
+  });
+
+  const statusFilter = document.getElementById('statusFilter');
+  const categoryFilter = document.getElementById('categoryFilter');
+  [statusFilter, categoryFilter].forEach((el) => el.addEventListener('change', loadTable));
+
+  async function loadTable() {
+    const q = new URLSearchParams();
+    if (statusFilter.value) q.set('status', statusFilter.value);
+    if (categoryFilter.value) q.set('category', categoryFilter.value);
+    const data = await API.get('/api/problems?' + q.toString());
+    const body = document.getElementById('tableBody');
+    if (data.problems.length === 0) {
+      body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:30px;">No challenges match these filters.</td></tr>`;
+      return;
+    }
+    body.innerHTML = data.problems.map((p) => `
+      <tr onclick="window.location.href='/problem.html?id=${encodeURIComponent(p.id)}'" style="cursor:pointer;">
+        <td class="mono">${p.id}</td>
+        <td>${escapeHtml(p.title)}</td>
+        <td>${p.category}</td>
+        <td>${escapeHtml(p.district)}</td>
+        <td>${p.priority}</td>
+        <td><span class="${badgeClass(p.status)}">${p.status}</span></td>
+        <td>${timeAgo(p.createdAt)}</td>
+        <td>${trackingFlag(p)}</td>
+      </tr>
+    `).join('');
+  }
+  loadTable();
+}
+
+// Rule-based flag (not AI) — surfaces cases with no status movement in a
+// while so a coordinator can follow up. Purely a date comparison.
+function trackingFlag(p) {
+  if (['Resolved', 'Rejected'].includes(p.status)) return '<span class="hint">—</span>';
+  const days = Math.floor((Date.now() - new Date(p.updatedAt || p.createdAt).getTime()) / 86400000);
+  if (days >= 7) return `<span class="badge badge-Rejected">⚠ Stalled ${days}d</span>`;
+  return '<span class="hint">On track</span>';
+}
+</script>
+</body>
+</html>

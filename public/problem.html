@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge Detail — JanSatu</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="topbar" class="topbar"></div>
+
+<div class="container" style="padding-top:24px;">
+  <div id="submittedBanner" style="display:none;" class="alert alert-success">Your challenge was submitted. Keep this ID for reference — you'll see status updates here as reviewers act on it.</div>
+</div>
+
+<div id="content"></div>
+
+<footer>
+  <div class="container"><p>JanSatu</p></div>
+</footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script>
+renderNav('');
+function escapeHtml(s) { return (s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+const params = new URLSearchParams(window.location.search);
+const id = params.get('id');
+if (params.get('submitted')) document.getElementById('submittedBanner').style.display = 'block';
+
+const user = API.user();
+const canReview = user && ['admin', 'institution', 'industry'].includes(user.role);
+
+if (!id) {
+  document.getElementById('content').innerHTML = `<section class="container"><div class="empty-state"><h3>No challenge ID given</h3><a href="/browse.html" class="btn btn-primary">Browse challenges</a></div></section>`;
+} else {
+  load();
+}
+
+let institutionsCache = [];
+
+async function load() {
+  try {
+    const [{ problem }, instData] = await Promise.all([
+      API.get('/api/problems/' + encodeURIComponent(id)),
+      API.get('/api/institutions')
+    ]);
+    institutionsCache = instData.institutions;
+    render(problem);
+  } catch (err) {
+    document.getElementById('content').innerHTML = `<section class="container"><div class="alert alert-error">${err.message}</div></section>`;
+  }
+}
+
+function render(p) {
+  const assigned = institutionsCache.find((i) => i.id === p.assignedInstitutionId);
+  const mediaHtml = (p.media && p.media.length)
+    ? `<div class="media-grid">${p.media.map((m) => m.dataBase64 && m.type.startsWith('image')
+        ? `<img src="${m.dataBase64}" alt="${escapeHtml(m.name)}">`
+        : `<div class="file-chip" style="justify-content:center;">${escapeHtml(m.name)}</div>`).join('')}</div>`
+    : `<p class="hint">No media attached.</p>`;
+
+  document.getElementById('content').innerHTML = `
+    <div class="page-head">
+      <div class="container">
+        <div class="eyebrow">${p.id} · ${p.category}</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <h1 style="font-size:2rem;margin:0;">${escapeHtml(p.title)}</h1>
+          <span class="${badgeClass(p.status)}">${p.status}</span>
+        </div>
+      </div>
+    </div>
+    <section class="container">
+      <div class="detail-grid">
+        <div>
+          <div class="side-panel" style="background:#fff;border-color:var(--ochre);margin-bottom:22px;">
+            <h4 style="color:var(--ochre);">✨ AI status summary</h4>
+            <div id="aiSummaryBox">
+              ${p.aiSummary
+                ? `<p style="margin:0 0 10px;">${escapeHtml(p.aiSummary)}</p><span class="hint">Generated ${new Date(p.aiSummaryAt).toLocaleString('en-IN')}</span>`
+                : `<p class="hint" style="margin:0 0 10px;">No summary yet — generate a plain-language explanation of this case's progress.</p>`
+              }
+            </div>
+            <button class="btn btn-outline btn-sm" id="aiSummaryBtn" style="margin-top:10px;">
+              ${p.aiSummary ? '↻ Regenerate summary' : '✨ Generate AI summary'}
+            </button>
+          </div>
+          <h3>Description</h3>
+          <p>${escapeHtml(p.description)}</p>
+          <h3>Evidence</h3>
+          ${mediaHtml}
+          <h3 style="margin-top:32px;">Status timeline</h3>
+          <ul class="timeline">
+            ${p.history.slice().reverse().map((h) => `
+              <li>
+                <div class="t-status">${h.status}</div>
+                ${h.note ? `<div class="t-note">${escapeHtml(h.note)}</div>` : ''}
+                <div class="t-time">${new Date(h.at).toLocaleString('en-IN')}${h.by ? ' · ' + escapeHtml(h.by) : ''}</div>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+        <div>
+          <div class="side-panel">
+            <h4>Location</h4>
+            <div class="kv"><span>District</span><span>${escapeHtml(p.district)}</span></div>
+            ${p.block ? `<div class="kv"><span>Block</span><span>${escapeHtml(p.block)}</span></div>` : ''}
+            ${p.village ? `<div class="kv"><span>Village / Ward</span><span>${escapeHtml(p.village)}</span></div>` : ''}
+            ${p.latitude ? `<div class="kv"><span>Coordinates</span><span class="mono">${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}</span></div>` : ''}
+          </div>
+          <div class="side-panel">
+            <h4>Submission</h4>
+            <div class="kv"><span>Filed by</span><span>${escapeHtml(p.submittedBy.name)}</span></div>
+            <div class="kv"><span>Priority</span><span>${p.priority}</span></div>
+            <div class="kv"><span>Filed on</span><span>${new Date(p.createdAt).toLocaleDateString('en-IN')}</span></div>
+          </div>
+          <div class="side-panel">
+            <h4>Assigned to</h4>
+            <p style="margin:0;">${assigned ? escapeHtml(assigned.name) : 'Not yet assigned'}</p>
+          </div>
+          ${canReview ? reviewPanel(p) : ''}
+        </div>
+      </div>
+    </section>
+  `;
+
+  if (canReview) wireReviewPanel(p);
+  wireAISummary(p);
+}
+
+function wireAISummary(p) {
+  const btn = document.getElementById('aiSummaryBtn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const box = document.getElementById('aiSummaryBox');
+    btn.disabled = true;
+    box.innerHTML = `<p class="hint" style="margin:0;">Generating…</p>`;
+    try {
+      const { summary } = await API.post(`/api/problems/${encodeURIComponent(p.id)}/ai-summary`, {});
+      box.innerHTML = `<p style="margin:0 0 10px;">${escapeHtml(summary)}</p><span class="hint">Generated just now</span>`;
+      btn.textContent = '↻ Regenerate summary';
+    } catch (err) {
+      box.innerHTML = `<div class="alert alert-error" style="margin:0;">${err.message}</div>`;
+    }
+    btn.disabled = false;
+  });
+}
+
+function reviewPanel(p) {
+  const options = institutionsCache.map((i) => `<option value="${i.id}" ${p.assignedInstitutionId === i.id ? 'selected' : ''}>${escapeHtml(i.name)}</option>`).join('');
+  return `
+    <div class="side-panel" style="background:#fff;border-color:var(--ink);">
+      <h4>Reviewer actions</h4>
+      <div class="field">
+        <label for="statusSelect">Update status</label>
+        <select id="statusSelect">
+          ${['Submitted','Under Review','Assigned','In Progress','Resolved','Rejected'].map((s) => `<option ${s === p.status ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label for="statusNote">Note (optional)</label>
+        <textarea id="statusNote" style="min-height:70px;" placeholder="Add context for this update"></textarea>
+      </div>
+      <button class="btn btn-sal btn-block" id="updateStatusBtn">Update status</button>
+      ${user.role === 'admin' ? `
+        <div class="field" style="margin-top:18px;">
+          <label for="assignSelect">Assign to institution</label>
+          <select id="assignSelect"><option value="" disabled ${!p.assignedInstitutionId ? 'selected' : ''}>Choose institution…</option>${options}</select>
+        </div>
+        <button class="btn btn-primary btn-block" id="assignBtn">Assign challenge</button>
+      ` : ''}
+      <div id="reviewAlert"></div>
+    </div>
+  `;
+}
+
+function wireReviewPanel(p) {
+  document.getElementById('updateStatusBtn').addEventListener('click', async () => {
+    try {
+      await API.put(`/api/problems/${encodeURIComponent(p.id)}/status`, {
+        status: document.getElementById('statusSelect').value,
+        note: document.getElementById('statusNote').value
+      });
+      load();
+    } catch (err) { document.getElementById('reviewAlert').innerHTML = `<div class="alert alert-error">${err.message}</div>`; }
+  });
+  const assignBtn = document.getElementById('assignBtn');
+  if (assignBtn) {
+    assignBtn.addEventListener('click', async () => {
+      const val = document.getElementById('assignSelect').value;
+      if (!val) return;
+      try {
+        await API.put(`/api/problems/${encodeURIComponent(p.id)}/assign`, { institutionId: val });
+        load();
+      } catch (err) { document.getElementById('reviewAlert').innerHTML = `<div class="alert alert-error">${err.message}</div>`; }
+    });
+  }
+}
+</script>
+</body>
+</html>

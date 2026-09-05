@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Sign In — JanSatu</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  body { background: var(--ink); }
+  .admin-shell { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .admin-card {
+    background: var(--paper); border-radius: var(--radius); padding: 40px;
+    max-width: 420px; width: 100%; border-top: 4px solid var(--ochre);
+  }
+  .admin-badge {
+    font-family: var(--font-mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ochre); display: flex; align-items: center; gap: 8px; margin-bottom: 18px;
+  }
+  .admin-badge::before { content: '🔒'; }
+  .admin-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 26px; }
+  .admin-brand .brand-mark { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: .8rem; }
+  .admin-brand span { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; }
+  .back-link { display: block; text-align: center; margin-top: 18px; font-size: .84rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="admin-shell">
+  <div class="admin-card">
+    <div class="admin-badge">Restricted access</div>
+    <div class="admin-brand">
+      <span class="brand-mark">JS</span>
+      <span>Programme Admin</span>
+    </div>
+
+    <div id="alertBox"></div>
+
+    <form id="adminLoginForm">
+      <div class="field">
+        <label for="email">Admin email</label>
+        <input type="email" id="email" required placeholder="you@example.com" autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" required placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="loginBtn">Sign in</button>
+    </form>
+
+    <a href="/index.html" class="back-link">← Back to the public site</a>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+function showAlert(type, msg) {
+  document.getElementById('alertBox').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+}
+
+// If someone's already got a non-admin session active, don't silently reuse
+// it here — this page's whole point is a clean, explicit admin check.
+API.clearSession();
+
+document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const data = await API.post('/api/auth/login', {
+      email: document.getElementById('email').value,
+      password: document.getElementById('password').value
+    });
+    if (data.user.role !== 'admin') {
+      API.clearSession();
+      showAlert('error', 'This account does not have admin access.');
+      btn.disabled = false; btn.textContent = 'Sign in';
+      return;
+    }
+    API.setSession(data.token, data.user);
+    window.location.href = '/dashboard.html';
+  } catch (err) {
+    showAlert('error', err.message);
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+});
+</script>
+</body>
+</html>

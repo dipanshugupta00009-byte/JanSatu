@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report a Challenge — JanSatu</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="topbar" class="topbar"></div>
+
+<div class="page-head">
+  <div class="container">
+    <div class="eyebrow">New registry entry</div>
+    <h1 style="font-size:2rem;">Report a local challenge</h1>
+    <p style="color:var(--muted);max-width:60ch;">Be specific — the more detail and evidence you give, the faster a reviewer can classify and route this to the right institution.</p>
+  </div>
+</div>
+
+<section class="container">
+  <div id="signedOutNotice" style="display:none;" class="form-card" style="max-width:640px;">
+    <p>You need an account to submit a challenge and track its progress.</p>
+    <a href="/auth.html" class="btn btn-primary">Sign in / Create account</a>
+  </div>
+
+  <form id="submitForm" class="form-card wide">
+    <div id="alertBox"></div>
+
+    <div class="field">
+      <label for="title">Challenge title</label>
+      <input type="text" id="title" required placeholder="e.g. Contaminated handpump water in Ward 6">
+    </div>
+
+    <div class="field">
+      <label for="category">Category</label>
+      <select id="category" required>
+        <option value="" disabled selected>Select a category</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="description">Describe the problem</label>
+      <textarea id="description" required placeholder="What is happening, since when, who is affected, and what have you already tried or observed?"></textarea>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
+        <button type="button" id="aiSuggestBtn" class="btn btn-ghost btn-sm">✨ AI: Suggest category &amp; priority</button>
+        <button type="button" id="aiDuplicateBtn" class="btn btn-ghost btn-sm">🔍 Check for similar reports</button>
+      </div>
+      <div id="aiSuggestResult"></div>
+      <div id="aiDuplicateResult"></div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="district">District</label>
+        <input type="text" id="district" required placeholder="e.g. Ranchi">
+      </div>
+      <div class="field">
+        <label for="block">Block / Municipality</label>
+        <input type="text" id="block" placeholder="e.g. Namkum">
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="village">Village / Ward / Locality</label>
+        <input type="text" id="village" placeholder="e.g. Ward 6, Bariatu">
+      </div>
+      <div class="field">
+        <label>GPS location</label>
+        <button type="button" id="locateBtn" class="btn btn-ghost btn-block">📍 Use my current location</button>
+        <div class="hint" id="locateResult"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Priority — how urgent does this feel?</label>
+      <div class="radio-group" id="priorityGroup">
+        <label class="radio-pill"><input type="radio" name="priority" value="Low"> Low</label>
+        <label class="radio-pill checked"><input type="radio" name="priority" value="Medium" checked> Medium</label>
+        <label class="radio-pill"><input type="radio" name="priority" value="High"> High</label>
+        <label class="radio-pill"><input type="radio" name="priority" value="Critical"> Critical</label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Photos, videos or documents (up to 5)</label>
+      <div class="file-drop" id="fileDrop">
+        <p style="margin:0;">Click to choose files, or drag them here</p>
+        <p class="hint" style="margin:6px 0 0;">JPG, PNG, MP4, PDF — max ~5MB each recommended</p>
+      </div>
+      <input type="file" id="fileInput" multiple accept="image/*,video/*,.pdf" style="display:none;">
+      <div class="file-list" id="fileList"></div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Submit challenge</button>
+  </form>
+</section>
+
+<footer>
+  <div class="container"><p>JanSatu</p></div>
+</footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script>
+renderNav('submit');
+
+const user = API.user();
+if (!user) {
+  document.getElementById('signedOutNotice').style.display = 'block';
+  document.getElementById('submitForm').style.display = 'none';
+}
+
+API.get('/api/categories').then((c) => {
+  const sel = document.getElementById('category');
+  c.categories.forEach((cat) => {
+    const opt = document.createElement('option');
+    opt.value = cat; opt.textContent = cat;
+    sel.appendChild(opt);
+  });
+});
+
+document.querySelectorAll('#priorityGroup input').forEach((r) => r.addEventListener('change', () => {
+  document.querySelectorAll('#priorityGroup .radio-pill').forEach((p) => p.classList.remove('checked'));
+  r.closest('.radio-pill').classList.add('checked');
+}));
+
+let lat = null, lng = null;
+document.getElementById('locateBtn').addEventListener('click', () => {
+  const result = document.getElementById('locateResult');
+  if (!navigator.geolocation) { result.textContent = 'Geolocation not supported on this device.'; return; }
+  result.textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition((pos) => {
+    lat = pos.coords.latitude; lng = pos.coords.longitude;
+    result.textContent = `Captured: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }, () => { result.textContent = 'Could not get location — you can still submit without it.'; });
+});
+
+let files = [];
+const fileDrop = document.getElementById('fileDrop');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+fileDrop.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  Array.from(fileInput.files).forEach((f) => { if (files.length < 5) files.push(f); });
+  renderFileList();
+});
+function renderFileList() {
+  fileList.innerHTML = files.map((f, i) => `<span class="file-chip">${f.name}<button type="button" data-i="${i}">×</button></span>`).join('');
+  fileList.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    files.splice(Number(b.dataset.i), 1); renderFileList();
+  }));
+}
+
+function showAlert(type, msg) {
+  document.getElementById('alertBox').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+}
+
+// ---------- AI: suggest category & priority ----------
+document.getElementById('aiSuggestBtn').addEventListener('click', async () => {
+  const title = document.getElementById('title').value.trim();
+  const description = document.getElementById('description').value.trim();
+  const resultBox = document.getElementById('aiSuggestResult');
+  if (!title || !description) {
+    resultBox.innerHTML = `<div class="alert alert-error" style="margin-top:10px;">Fill in the title and description first.</div>`;
+    return;
+  }
+  resultBox.innerHTML = `<p class="hint" style="margin-top:10px;">Thinking…</p>`;
+  try {
+    const suggestion = await API.post('/api/ai/suggest-category', { title, description });
+    document.getElementById('category').value = suggestion.category;
+    document.querySelectorAll('#priorityGroup input').forEach((r) => {
+      const match = r.value === suggestion.priority;
+      r.checked = match;
+      r.closest('.radio-pill').classList.toggle('checked', match);
+    });
+    resultBox.innerHTML = `<div class="alert alert-success" style="margin-top:10px;">
+      ✨ AI suggested <strong>${suggestion.category}</strong> · <strong>${suggestion.priority}</strong> priority — ${suggestion.reason || ''}
+      <br><span class="hint">Please double-check this before submitting — you can still change it.</span>
+    </div>`;
+  } catch (err) {
+    resultBox.innerHTML = `<div class="alert alert-error" style="margin-top:10px;">${err.message}</div>`;
+  }
+});
+
+// ---------- Duplicate check (local text-similarity, not an AI call) ----------
+document.getElementById('aiDuplicateBtn').addEventListener('click', async () => {
+  const title = document.getElementById('title').value.trim();
+  const description = document.getElementById('description').value.trim();
+  const category = document.getElementById('category').value;
+  const resultBox = document.getElementById('aiDuplicateResult');
+  if (!title || !description) {
+    resultBox.innerHTML = `<div class="alert alert-error" style="margin-top:10px;">Fill in the title and description first.</div>`;
+    return;
+  }
+  resultBox.innerHTML = `<p class="hint" style="margin-top:10px;">Checking…</p>`;
+  try {
+    const { matches } = await API.post('/api/ai/check-duplicates', { title, description, category });
+    if (!matches.length) {
+      resultBox.innerHTML = `<div class="alert alert-success" style="margin-top:10px;">No similar reports found — looks like a new case.</div>`;
+      return;
+    }
+    resultBox.innerHTML = `<div class="alert alert-error" style="margin-top:10px;">
+      This looks similar to ${matches.length} existing report${matches.length > 1 ? 's' : ''}:
+      <ul style="margin:8px 0 0;padding-left:18px;">
+        ${matches.map((m) => `<li><a href="/problem.html?id=${encodeURIComponent(m.id)}" target="_blank">${escapeHtmlLocal(m.title)}</a> <span class="hint">(${m.score}% similar · ${m.status})</span></li>`).join('')}
+      </ul>
+      <span class="hint">If one of these is the same problem, consider tracking that case instead of submitting a duplicate.</span>
+    </div>`;
+  } catch (err) {
+    resultBox.innerHTML = `<div class="alert alert-error" style="margin-top:10px;">${err.message}</div>`;
+  }
+});
+function escapeHtmlLocal(s) { return (s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+
+document.getElementById('submitForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+  try {
+    const media = await Promise.all(files.map(async (f) => ({
+      name: f.name, type: f.type, dataBase64: await fileToBase64(f)
+    })));
+    const data = await API.post('/api/problems', {
+      title: document.getElementById('title').value,
+      category: document.getElementById('category').value,
+      description: document.getElementById('description').value,
+      district: document.getElementById('district').value,
+      block: document.getElementById('block').value,
+      village: document.getElementById('village').value,
+      latitude: lat, longitude: lng,
+      priority: document.querySelector('#priorityGroup input:checked').value,
+      media
+    });
+    window.location.href = '/problem.html?id=' + encodeURIComponent(data.problem.id) + '&submitted=1';
+  } catch (err) {
+    showAlert('error', err.message);
+    btn.disabled = false; btn.textContent = 'Submit challenge';
+  }
+});
+</script>
+</body>
+</html>

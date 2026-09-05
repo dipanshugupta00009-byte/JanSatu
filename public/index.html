@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JanSatu — Citizen Challenges, Academic Solutions</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="topbar" class="topbar"></div>
+
+<header class="hero">
+  <div class="container hero-grid">
+    <div>
+      <div class="eyebrow">Registry No. opens on submission</div>
+      <h1>Every local problem deserves a case file — and a team working to solve it.</h1>
+      <p class="lead">A shared registry where citizens of Jharkhand report real problems in education, health, water, farming, sanitation and more — and universities, researchers and industry pick them up as live projects, in the spirit of NEP 2020's push for experiential, community-linked learning.</p>
+      <div class="hero-cta">
+        <a href="/submit.html" class="btn btn-primary">Report a Challenge</a>
+        <a href="/browse.html" class="btn btn-outline">Browse Open Challenges</a>
+      </div>
+    </div>
+    <div class="ledger-card">
+      <div class="ledger-title">Sample Registry Entry</div>
+      <div class="ledger-row"><span class="n">ID</span><span>JS-2026-004821</span></div>
+      <div class="ledger-row"><span class="n">Category</span><span>Water Management</span></div>
+      <div class="ledger-row"><span class="n">District</span><span>Gumla</span></div>
+      <div class="ledger-row"><span class="n">Status</span><span>Assigned → BIT Mesra</span></div>
+      <div class="ledger-row"><span class="n">Filed by</span><span>Citizen, Ward 4</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="hatch-divider"></div>
+
+<section class="stats-strip container" id="statsStrip" style="padding:0;">
+  <div class="stat-cell"><div class="stat-num" id="statTotal">—</div><div class="stat-label">Challenges filed</div></div>
+  <div class="stat-cell"><div class="stat-num" id="statResolved">—</div><div class="stat-label">Marked resolved</div></div>
+  <div class="stat-cell"><div class="stat-num" id="statAssigned">—</div><div class="stat-label">With an institution</div></div>
+  <div class="stat-cell"><div class="stat-num" id="statInst">—</div><div class="stat-label">Partner institutions</div></div>
+</section>
+
+<section class="container">
+  <div class="section-head">
+    <div class="eyebrow">Why this exists</div>
+    <h2>Three groups, one missing link</h2>
+  </div>
+  <div class="pillar-grid">
+    <div class="pillar-card">
+      <div class="num">01</div>
+      <h3>Citizens see it first</h3>
+      <p>Communities across Jharkhand are the first to notice a broken handpump, an unsafe road crossing, or a school with no science lab — but have no structured place to file it for real evaluation.</p>
+    </div>
+    <div class="pillar-card">
+      <div class="num">02</div>
+      <h3>Institutions have the expertise</h3>
+      <p>HEIs bring research capability and a large, capable student body looking for real, community-linked problems — exactly what NEP 2020 asks for.</p>
+    </div>
+    <div class="pillar-card">
+      <div class="num">03</div>
+      <h3>Industry brings scale</h3>
+      <p>Start-ups and companies add technical depth, funding and the ability to actually deploy a working solution beyond the prototype stage.</p>
+    </div>
+  </div>
+</section>
+
+<div class="hatch-divider sal"></div>
+
+<section class="container">
+  <div class="section-head">
+    <div class="eyebrow">How a challenge moves</div>
+    <h2>From a photo on a phone to a resolved case file</h2>
+  </div>
+  <div class="flow-steps">
+    <div class="flow-step"><div class="step-n">01</div><h4>Submit</h4><p>Citizen files a challenge with photos, location and category.</p></div>
+    <div class="flow-step"><div class="step-n">02</div><h4>Review</h4><p>Coordinators verify and classify the submission.</p></div>
+    <div class="flow-step"><div class="step-n">03</div><h4>Assign</h4><p>Matched to an HEI or industry partner by focus area.</p></div>
+    <div class="flow-step"><div class="step-n">04</div><h4>Build</h4><p>Students / researchers / partners work the case as a live project.</p></div>
+    <div class="flow-step"><div class="step-n">05</div><h4>Resolve</h4><p>Outcome logged back to the same public case file.</p></div>
+  </div>
+</section>
+
+<section class="container">
+  <div class="section-head">
+    <div class="eyebrow">Coverage</div>
+    <h2>Ten challenge categories, open from day one</h2>
+  </div>
+  <div class="category-chip-grid" id="categoryChips"></div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>JanSatu — a citizen · HEI · industry problem-solving registry, aligned with NEP 2020.</p>
+    <p class="mono"><a href="/admin-login.html" style="color:var(--muted);">Admin sign in</a> · Prototype build</p>
+  </div>
+</footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script>
+renderNav('home');
+
+API.get('/api/stats').then((s) => {
+  document.getElementById('statTotal').textContent = s.total;
+  document.getElementById('statResolved').textContent = s.byStatus['Resolved'] || 0;
+  document.getElementById('statAssigned').textContent = s.byStatus['Assigned'] || 0;
+  document.getElementById('statInst').textContent = s.institutions;
+}).catch(() => {});
+
+API.get('/api/categories').then((c) => {
+  document.getElementById('categoryChips').innerHTML = c.categories.map((cat) => `<span class="chip">${cat}</span>`).join('');
+}).catch(() => {});
+</script>
+</body>
+</html>

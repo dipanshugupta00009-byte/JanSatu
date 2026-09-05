@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in — JanSatu</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="topbar" class="topbar"></div>
+
+<div class="page-head">
+  <div class="container">
+    <div class="eyebrow">Account access</div>
+    <h1 style="font-size:2rem;">Sign in or create an account</h1>
+  </div>
+</div>
+
+<section class="container">
+  <div class="form-card">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="login">Sign in</button>
+      <button class="tab-btn" data-tab="register">Create account</button>
+    </div>
+
+    <div id="alertBox"></div>
+
+    <!-- LOGIN -->
+    <form id="loginForm">
+      <div class="field">
+        <label for="loginEmail">Email</label>
+        <input type="email" id="loginEmail" required placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" required placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+    </form>
+
+    <!-- REGISTER -->
+    <form id="registerForm" style="display:none;">
+      <div class="field">
+        <label>I am signing up as</label>
+        <div class="radio-group" id="roleGroup">
+          <label class="radio-pill checked"><input type="radio" name="role" value="citizen" checked> Citizen</label>
+          <label class="radio-pill"><input type="radio" name="role" value="institution"> HEI / Institution</label>
+          <label class="radio-pill"><input type="radio" name="role" value="industry"> Industry / Start-up</label>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="regName">Full name</label>
+          <input type="text" id="regName" required placeholder="e.g. Anjali Kumari">
+        </div>
+        <div class="field">
+          <label for="regPhone">Phone</label>
+          <input type="tel" id="regPhone" placeholder="10-digit mobile">
+        </div>
+      </div>
+      <div class="field" id="orgField" style="display:none;">
+        <label for="regOrg">Organisation / Institution name</label>
+        <input type="text" id="regOrg" placeholder="e.g. BIT Mesra">
+      </div>
+      <div class="field">
+        <label for="regDistrict">District</label>
+        <input type="text" id="regDistrict" placeholder="e.g. Ranchi">
+      </div>
+      <div class="field">
+        <label for="regEmail">Email</label>
+        <input type="email" id="regEmail" required placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label for="regPassword">Password</label>
+        <input type="password" id="regPassword" required minlength="8" placeholder="At least 8 characters, with a letter and a number">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Create account</button>
+    </form>
+  </div>
+</section>
+
+<footer>
+  <div class="container"><p>JanSatu</p></div>
+</footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script>
+renderNav('');
+
+const tabs = document.querySelectorAll('.tab-btn');
+const loginForm = document.getElementById('loginForm');
+const registerForm = document.getElementById('registerForm');
+tabs.forEach((t) => t.addEventListener('click', () => {
+  tabs.forEach((x) => x.classList.remove('active'));
+  t.classList.add('active');
+  const which = t.dataset.tab;
+  loginForm.style.display = which === 'login' ? 'block' : 'none';
+  registerForm.style.display = which === 'register' ? 'block' : 'none';
+  document.getElementById('alertBox').innerHTML = '';
+}));
+
+document.querySelectorAll('#roleGroup input').forEach((r) => r.addEventListener('change', () => {
+  document.querySelectorAll('.radio-pill').forEach((p) => p.classList.remove('checked'));
+  r.closest('.radio-pill').classList.add('checked');
+  document.getElementById('orgField').style.display = (r.value === 'institution' || r.value === 'industry') ? 'block' : 'none';
+}));
+
+function showAlert(type, msg) {
+  document.getElementById('alertBox').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+}
+
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = loginForm.querySelector('button[type=submit]');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const data = await API.post('/api/auth/login', {
+      email: document.getElementById('loginEmail').value,
+      password: document.getElementById('loginPassword').value
+    });
+    API.setSession(data.token, data.user);
+    window.location.href = data.user.role === 'citizen' ? '/track.html' : '/dashboard.html';
+  } catch (err) {
+    showAlert('error', err.message);
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+});
+
+registerForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const role = document.querySelector('#roleGroup input:checked').value;
+  const btn = registerForm.querySelector('button[type=submit]');
+  btn.disabled = true; btn.textContent = 'Creating account…';
+  try {
+    const data = await API.post('/api/auth/register', {
+      name: document.getElementById('regName').value,
+      phone: document.getElementById('regPhone').value,
+      organization: document.getElementById('regOrg').value,
+      district: document.getElementById('regDistrict').value,
+      email: document.getElementById('regEmail').value,
+      password: document.getElementById('regPassword').value,
+      role
+    });
+    API.setSession(data.token, data.user);
+    window.location.href = role === 'citizen' ? '/submit.html' : '/dashboard.html';
+  } catch (err) {
+    showAlert('error', err.message);
+    btn.disabled = false; btn.textContent = 'Create account';
+  }
+});
+</script>
+</body>
+</html>

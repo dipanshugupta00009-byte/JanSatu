@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Submissions — JanSatu</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="topbar" class="topbar"></div>
+
+<div class="page-head">
+  <div class="container">
+    <div class="eyebrow">Your registry entries</div>
+    <h1 style="font-size:2rem;">My submissions</h1>
+  </div>
+</div>
+
+<section class="container">
+  <div id="signedOutNotice" style="display:none;" class="form-card">
+    <p>Sign in to see the challenges you've submitted.</p>
+    <a href="/auth.html" class="btn btn-primary">Sign in / Create account</a>
+  </div>
+  <div id="problemList" class="problem-list"></div>
+</section>
+
+<footer>
+  <div class="container"><p>JanSatu</p></div>
+</footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script>
+renderNav('track');
+function escapeHtml(s) { return (s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+const user = API.user();
+if (!user) {
+  document.getElementById('signedOutNotice').style.display = 'block';
+} else {
+  API.get('/api/problems?mine=true').then((data) => {
+    const list = document.getElementById('problemList');
+    if (data.problems.length === 0) {
+      list.innerHTML = `<div class="empty-state"><h3>You haven't reported anything yet</h3><p>File your first challenge — it takes less than two minutes.</p><a href="/submit.html" class="btn btn-primary">Report a Challenge</a></div>`;
+      return;
+    }
+    list.innerHTML = data.problems.map((p) => `
+      <a href="/problem.html?id=${encodeURIComponent(p.id)}" class="problem-card" style="text-decoration:none;color:inherit;">
+        <div>
+          <div class="problem-id">${p.id} · ${p.category}</div>
+          <h3>${escapeHtml(p.title)}</h3>
+          <div class="meta-row">
+            <span>📍 ${escapeHtml(p.district)}</span>
+            <span>⏱ ${timeAgo(p.createdAt)}</span>
+          </div>
+        </div>
+        <span class="${badgeClass(p.status)}">${p.status}</span>
+      </a>
+    `).join('');
+  });
+}
+</script>
+</body>
+</html>

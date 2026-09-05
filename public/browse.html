@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browse Challenges — JanSatu</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="topbar" class="topbar"></div>
+
+<div class="page-head">
+  <div class="container">
+    <div class="eyebrow">Open registry</div>
+    <h1 style="font-size:2rem;">Browse challenges</h1>
+    <p style="color:var(--muted);max-width:60ch;">Institutions and industry partners: filter by category or district to find a challenge worth adopting as a project.</p>
+  </div>
+</div>
+
+<section class="container">
+  <div class="filters-bar">
+    <input type="text" class="search-input" id="searchInput" placeholder="Search by keyword…">
+    <select id="categoryFilter"><option value="">All categories</option></select>
+    <select id="statusFilter">
+      <option value="">All statuses</option>
+      <option>Submitted</option>
+      <option>Under Review</option>
+      <option>Assigned</option>
+      <option>In Progress</option>
+      <option>Resolved</option>
+      <option>Rejected</option>
+    </select>
+    <input type="text" id="districtFilter" placeholder="District…" style="min-width:140px;">
+    <button class="btn btn-outline btn-sm" id="clearFilters">Clear</button>
+  </div>
+
+  <div id="resultsCount" class="hint" style="margin-bottom:16px;color:var(--muted);font-family:var(--font-mono);font-size:.8rem;"></div>
+  <div id="problemList" class="problem-list"></div>
+</section>
+
+<footer>
+  <div class="container"><p>JanSatu</p></div>
+</footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+<script>
+renderNav('browse');
+
+API.get('/api/categories').then((c) => {
+  const sel = document.getElementById('categoryFilter');
+  c.categories.forEach((cat) => {
+    const opt = document.createElement('option'); opt.value = cat; opt.textContent = cat;
+    sel.appendChild(opt);
+  });
+});
+
+const searchInput = document.getElementById('searchInput');
+const categoryFilter = document.getElementById('categoryFilter');
+const statusFilter = document.getElementById('statusFilter');
+const districtFilter = document.getElementById('districtFilter');
+let debounceTimer;
+
+function buildQuery() {
+  const q = new URLSearchParams();
+  if (searchInput.value.trim()) q.set('search', searchInput.value.trim());
+  if (categoryFilter.value) q.set('category', categoryFilter.value);
+  if (statusFilter.value) q.set('status', statusFilter.value);
+  if (districtFilter.value.trim()) q.set('district', districtFilter.value.trim());
+  return q.toString();
+}
+
+async function load() {
+  const list = document.getElementById('problemList');
+  list.innerHTML = '<p class="hint">Loading…</p>';
+  try {
+    const data = await API.get('/api/problems?' + buildQuery());
+    document.getElementById('resultsCount').textContent = data.count + ' result' + (data.count === 1 ? '' : 's');
+    if (data.problems.length === 0) {
+      list.innerHTML = `<div class="empty-state"><h3>No challenges match these filters</h3><p>Try widening your search, or be the first to report one.</p><a href="/submit.html" class="btn btn-primary">Report a Challenge</a></div>`;
+      return;
+    }
+    list.innerHTML = data.problems.map((p) => `
+      <a href="/problem.html?id=${encodeURIComponent(p.id)}" class="problem-card" style="text-decoration:none;color:inherit;">
+        <div>
+          <div class="problem-id">${p.id} · ${p.category}</div>
+          <h3>${escapeHtml(p.title)}</h3>
+          <p class="desc">${escapeHtml(p.description).slice(0, 160)}${p.description.length > 160 ? '…' : ''}</p>
+          <div class="meta-row">
+            <span>📍 ${escapeHtml(p.district)}${p.block ? ', ' + escapeHtml(p.block) : ''}</span>
+            <span>⏱ ${timeAgo(p.createdAt)}</span>
+            <span>⚑ ${p.priority}</span>
+          </div>
+        </div>
+        <span class="${badgeClass(p.status)}">${p.status}</span>
+      </a>
+    `).join('');
+  } catch (err) {
+    list.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+}
+function escapeHtml(s) { return (s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+[searchInput, categoryFilter, statusFilter, districtFilter].forEach((el) => {
+  el.addEventListener('input', () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(load, 250); });
+});
+document.getElementById('clearFilters').addEventListener('click', () => {
+  searchInput.value = ''; categoryFilter.value = ''; statusFilter.value = ''; districtFilter.value = ''; load();
+});
+
+load();
+</script>
+</body>
+</html>
